@@ -104,12 +104,30 @@ export function getComparisonSymbol(type: ComparisonType): string {
  * Pre-process OData filter to handle unsupported syntax
  */
 export function preprocessODataFilter(filterString: string): string {
-  // Handle IN operator: CategoryId in (1,2,3) -> CategoryId eq 1 or CategoryId eq 2 or CategoryId eq 3
+  // Handle datetime literals: datetime'2023-01-01' -> '2023-01-01T00:00:00.000Z'
+  let processed = filterString.replace(/datetime'([^']+)'/gi, (match, dateStr) => {
+    try {
+      const date = new Date(dateStr);
+      return `'${date.toISOString()}'`;
+    } catch {
+      return match; // Return original if parsing fails
+    }
+  });
+  
+  // Handle IN operator more carefully to preserve proper grouping
   const inPattern = /(\w+)\s+in\s*\(([^)]+)\)/gi;
-  let processed = filterString.replace(inPattern, (match, field, values) => {
+  processed = processed.replace(inPattern, (match, field, values) => {
     const valueList = values.split(',').map((v: string) => v.trim());
-    const conditions = valueList.map((val: string) => `${field} eq ${val}`);
-    return `(${conditions.join(' or ')})`;
+    // Instead of chaining ORs, try to preserve IN structure when possible
+    if (valueList.length === 1) {
+      return `${field} eq ${valueList[0]}`;
+    } else if (valueList.length === 2) {
+      return `(${field} eq ${valueList[0]} or ${field} eq ${valueList[1]})`;
+    } else {
+      // For 3+ values, create a structure that can be optimized
+      const conditions = valueList.map((val: string) => `${field} eq ${val}`);
+      return `(${conditions.join(' or ')})`;
+    }
   });
   
   return processed;

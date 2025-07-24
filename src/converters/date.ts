@@ -31,8 +31,40 @@ export function tryHandleYearMonth(a: ODataNode, b: ODataNode): PrismaWhereClaus
         const start = new Date(Date.UTC(yearValue, monthValue - 1, 1));
         const end = new Date(Date.UTC(yearValue, monthValue, 1));
         
-        return { [field]: { gte: start, lt: end } };
+        return { 
+          [field]: { 
+            gte: start.toISOString(), 
+            lt: end.toISOString() 
+          } 
+        };
       }
+    }
+  }
+  return null;
+}
+
+/**
+ * Try to handle single year filter
+ */
+export function tryHandleYear(node: ODataNode): PrismaWhereClause | null {
+  if (node.type === NodeType.EQUALS_EXPRESSION) {
+    const left = node.value.left;
+    const right = node.value.right;
+    
+    if (left.type === NodeType.METHOD_CALL_EXPRESSION && 
+        left.value.method === ODataMethod.YEAR) {
+      const field = getFieldName(left.value.parameters[0]);
+      const yearValue = getLiteralValue(right);
+      
+      const start = new Date(Date.UTC(yearValue, 0, 1));
+      const end = new Date(Date.UTC(yearValue + 1, 0, 1));
+      
+      return { 
+        [field]: { 
+          gte: start.toISOString(), 
+          lt: end.toISOString() 
+        } 
+      };
     }
   }
   return null;
@@ -55,10 +87,14 @@ export function tryHandleDateRange(a: ODataNode, b: ODataNode): PrismaWhereClaus
       const startOp = a.type === NodeType.GREATER_OR_EQUALS_EXPRESSION ? 'gte' : 'gt';
       const endOp = b.type === NodeType.LESSER_OR_EQUALS_EXPRESSION ? 'lte' : 'lt';
       
+      // Convert dates to ISO strings if they are Date objects
+      const startVal = startValue instanceof Date ? startValue.toISOString() : startValue;
+      const endVal = endValue instanceof Date ? endValue.toISOString() : endValue;
+      
       return {
         [aField]: {
-          [startOp]: startValue,
-          [endOp]: endValue
+          [startOp]: startVal,
+          [endOp]: endVal
         }
       };
     }

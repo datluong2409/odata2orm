@@ -90,7 +90,13 @@ export function handleMethod(node: ODataNode, options: ConversionOptions = {}): 
       const field = getFieldName(fieldNode);
       const searchValue = getLiteralValue(searchNode);
       // indexof returns >= 0 if found, -1 if not
-      return { [field]: { contains: searchValue } };
+      // When used with >= 0, it means "contains"
+      return { 
+        [field]: { 
+          contains: searchValue,
+          mode: options.caseSensitive ? PrismaStringMode.DEFAULT : PrismaStringMode.INSENSITIVE 
+        } 
+      };
     }
     
     case ODataMethod.TO_LOWER:

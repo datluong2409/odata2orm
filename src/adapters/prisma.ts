@@ -9,7 +9,7 @@ import { optimizeOrToIn } from '../utils/optimizer';
 import { fallbackParser } from '../utils/fallback';
 import { handleComparison } from '../converters/comparison';
 import { handleMethod, handleInExpression } from '../converters/methods';
-import { tryHandleYearMonth, tryHandleDateRange } from '../converters/date';
+import { tryHandleYearMonth, tryHandleDateRange, tryHandleYear } from '../converters/date';
 
 // Import the odata-v4-parser
 import * as odataParser from 'odata-v4-parser';
@@ -65,8 +65,13 @@ export class PrismaAdapter extends BaseOrmAdapter {
       case 'GreaterThanExpression':
       case 'GreaterOrEqualsExpression':
       case 'LesserThanExpression':
-      case 'LesserOrEqualsExpression':
+      case 'LesserOrEqualsExpression': {
+        // Check for single year handling first
+        const yearResult = tryHandleYear(node);
+        if (yearResult) return yearResult;
+        
         return this.handleComparison(node as ComparisonNode);
+      }
 
       case 'AndExpression': {
         const left = node.value.left;
