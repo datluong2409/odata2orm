@@ -1,0 +1,61 @@
+{
+  "name": "odata2orm",
+  "version": "2.0.0",
+  "description": "A universal library to convert OData queries to various ORM filters (Prisma, TypeORM, Sequelize, Mongoose)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "npm run clean && npm run compile",
+    "build:watch": "tsc --watch",
+    "clean": "rimraf dist",
+    "compile": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "ts-node src/index.ts",
+    "example": "ts-node examples.ts",
+    "example:new": "ts-node examples-new.ts",
+    "lint": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "adapters:info": "ts-node -e \"import { AdapterFactory } from './src'; console.log(JSON.stringify(AdapterFactory.getAdapterInfo(), null, 2))\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/datluong2409/odata2orm.git"
+  },
+  "keywords": [
+    "odata",
+    "orm",
+    "prisma",
+    "typeorm", 
+    "sequelize",
+    "mongoose",
+    "filter",
+    "converter",
+    "database",
+    "query",
+    "parser",
+    "sql",
+    "nosql",
+    "mongodb"
+  ],
+  "author": "datluong2409",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/datluong2409/odata2orm/issues"
+  },
+  "homepage": "https://github.com/datluong2409/odata2orm#readme",
+  "dependencies": {
+    "odata-v4-parser": "^0.1.29"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "rimraf": "^5.0.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ]
+}
