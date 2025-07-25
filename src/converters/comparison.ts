@@ -153,21 +153,17 @@ export function handleFunctionComparison(
       const threshold = getLiteralValue(right);
       
       if (node.type === NodeType.GREATER_OR_EQUALS_EXPRESSION && threshold === 0) {
-        return { 
-          [field]: { 
-            contains: searchValue, 
-            mode: options.caseSensitive ? PrismaStringMode.DEFAULT : PrismaStringMode.INSENSITIVE 
-          } 
-        };
+        const filter: any = { contains: searchValue };
+        if (options.caseSensitive !== undefined && !options.caseSensitive) {
+          filter.mode = PrismaStringMode.INSENSITIVE;
+        }
+        return { [field]: filter };
       } else if (node.type === NodeType.EQUALS_EXPRESSION && threshold === -1) {
-        return { 
-          NOT: { 
-            [field]: { 
-              contains: searchValue, 
-              mode: options.caseSensitive ? PrismaStringMode.DEFAULT : PrismaStringMode.INSENSITIVE 
-            } 
-          } 
-        };
+        const filter: any = { contains: searchValue };
+        if (options.caseSensitive !== undefined && !options.caseSensitive) {
+          filter.mode = PrismaStringMode.INSENSITIVE;
+        }
+        return { NOT: { [field]: filter } };
       }
       throw new Error(`Unsupported indexof comparison: ${node.type} with threshold ${threshold}`);
       

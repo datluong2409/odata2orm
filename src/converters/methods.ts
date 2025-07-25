@@ -28,35 +28,39 @@ export function handleMethod(node: ODataNode, options: ConversionOptions = {}): 
       const [fieldNode, searchNode] = parameters;
       const field = getFieldName(fieldNode);
       const searchValue = getLiteralValue(searchNode);
-      return { 
-        [field]: { 
-          contains: searchValue, 
-          mode: options.caseSensitive ? PrismaStringMode.DEFAULT : PrismaStringMode.INSENSITIVE 
-        } 
-      };
+      const filter: any = { contains: searchValue };
+      
+      if (options.caseSensitive !== undefined && !options.caseSensitive) {
+        filter.mode = PrismaStringMode.INSENSITIVE;
+      }
+      
+      return { [field]: filter };
     }
     
     case ODataMethod.SUBSTRING_OF: {
       const [substrNode, fieldNode] = parameters;
       const field = getFieldName(fieldNode);
       const searchValue = getLiteralValue(substrNode);
-      return { 
-        [field]: { 
-          contains: searchValue, 
-          mode: options.caseSensitive ? PrismaStringMode.DEFAULT : PrismaStringMode.INSENSITIVE 
-        } 
-      };
+      const filter: any = { contains: searchValue };
+      
+      if (options.caseSensitive !== undefined && !options.caseSensitive) {
+        filter.mode = PrismaStringMode.INSENSITIVE;
+      }
+      
+      return { [field]: filter };
     }
     
     case ODataMethod.STARTS_WITH: {
       let [fieldNode, prefixNode] = parameters;
-      let insensitive = !options.caseSensitive;
+      let insensitive = false;
       
       // Handle tolower wrapper
       if (fieldNode.type === NodeType.METHOD_CALL_EXPRESSION && 
           fieldNode.value.method === ODataMethod.TO_LOWER) {
         insensitive = true;
         fieldNode = fieldNode.value.parameters[0];
+      } else if (options.caseSensitive !== undefined && !options.caseSensitive) {
+        insensitive = true;
       }
       
       const field = getFieldName(fieldNode);
@@ -69,12 +73,15 @@ export function handleMethod(node: ODataNode, options: ConversionOptions = {}): 
     
     case ODataMethod.ENDS_WITH: {
       let [fieldNode, suffixNode] = parameters;
-      let insensitive = !options.caseSensitive;
+      let insensitive = false;
       
+      // Handle tolower wrapper
       if (fieldNode.type === NodeType.METHOD_CALL_EXPRESSION && 
           fieldNode.value.method === ODataMethod.TO_LOWER) {
         insensitive = true;
         fieldNode = fieldNode.value.parameters[0];
+      } else if (options.caseSensitive !== undefined && !options.caseSensitive) {
+        insensitive = true;
       }
       
       const field = getFieldName(fieldNode);
@@ -91,12 +98,13 @@ export function handleMethod(node: ODataNode, options: ConversionOptions = {}): 
       const searchValue = getLiteralValue(searchNode);
       // indexof returns >= 0 if found, -1 if not
       // When used with >= 0, it means "contains"
-      return { 
-        [field]: { 
-          contains: searchValue,
-          mode: options.caseSensitive ? PrismaStringMode.DEFAULT : PrismaStringMode.INSENSITIVE 
-        } 
-      };
+      const filter: any = { contains: searchValue };
+      
+      if (options.caseSensitive !== undefined && !options.caseSensitive) {
+        filter.mode = PrismaStringMode.INSENSITIVE;
+      }
+      
+      return { [field]: filter };
     }
     
     case ODataMethod.TO_LOWER:
