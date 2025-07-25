@@ -1,6 +1,6 @@
 {
   "name": "odata2orm",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A universal library to convert OData queries to various ORM filters (Prisma, TypeORM, Sequelize, Mongoose)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
