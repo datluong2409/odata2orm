@@ -8,6 +8,9 @@ import {
   ODataMethod
 } from '../enums';
 
+// Re-export OData query types
+export * from './odata-query';
+
 export interface ConversionOptions {
   caseSensitive?: boolean;
   [key: string]: any;
