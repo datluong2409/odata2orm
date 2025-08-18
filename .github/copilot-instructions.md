@@ -1,54 +1,104 @@
 # GitHub Copilot Instructions for odata2orm
 
-This document provides context and guidelines for GitHub Copilot when working with the odata2orm project.
+**odata2orm** is a universal TypeScript library that converts OData v4 query expressions to various ORM filters with schema validation and nested query support.
 
-## Project Overview
+## 🎯 Key Features
 
-**odata2orm** is a universal TypeScript library that converts OData query expressions to various ORM filters (Prisma, TypeORM, Sequelize, Mongoose) with full pagination support and abstract base class architecture.
+- **Multi-ORM Support**: Prisma (complete), TypeORM/Sequelize/Mongoose (framework ready)
+- **OData v4 Compliance**: Nested navigation, collection filters (any/all), lambda expressions
+- **Schema Validation**: Zod integration for type-safe field validation and nested object support
+- **Complete Pagination**: Full OData query parameters ($filter, $top, $skip, $orderby, $select, $count)
+- **Abstract Base Classes**: Consistent API across ORMs with BaseQueryBuilder
+- **Nested Query Support**: Deep object filtering and selection with schema validation
+- **TypeScript-First**: Full type definitions with IntelliSense support
 
-## Key Features
-
-- Multi-ORM support with abstract base class architecture
-- OData filter expression parsing and conversion
-- Complete pagination support with `$filter`, `$top`, `$skip`, `$orderby`, `$select`, `$count`
-- Abstract base query builders for consistent API across ORMs
-- TypeScript-first with comprehensive type definitions
-- Modular architecture with adapter and factory patterns
-
-## Architecture
+## 🏗️ Architecture
 
 ### Core Components
 
 1. **Adapters** (`src/adapters/`)
    - `base.ts` - Abstract base adapter class
-   - `factory.ts` - Adapter factory for creating ORM-specific adapters
-   - `prisma.ts` - Prisma ORM adapter (fully implemented)
-   - `prisma-query-builder.ts` - Complete Prisma query builder with pagination support
-   - `base-query-builder.ts` - Abstract base query builder for all ORMs
-   - `query-builder-factory.ts` - Factory for creating query builders
-   - `typeorm-query-builder.ts` - TypeORM query builder (framework ready)
-   - `sequelize-query-builder.ts` - Sequelize query builder (framework ready)
-   - `mongoose-query-builder.ts` - Mongoose query builder (framework ready)
-   - Other adapters (typeorm.ts, sequelize.ts, mongoose.ts) - Filter conversion pending
+   - `prisma.ts` - Complete Prisma implementation
+   - `prisma-query-builder.ts` - Enhanced Prisma query builder with schema support
+   - `base-query-builder.ts` - Abstract base for all ORM query builders
+   - Other ORMs (typeorm, sequelize, mongoose) - Framework ready
 
-2. **Converters** (`src/converters/`)
-   - `comparison.ts` - Handles comparison operations (eq, ne, gt, lt, etc.)
-   - `methods.ts` - Handles OData method calls (contains, startswith, etc.)
-   - `date.ts` - Special date handling and optimization
-   - `index.ts` - Main conversion entry point
+2. **Schema Validation** (`src/types/schema.ts`, `src/utils/`)
+   - `schema-validator.ts` - Zod schema validation and field path validation
+   - `nested-parser.ts` - OData v4 nested navigation parsing
+   - `field-path.ts` - Enhanced field path handling for nested objects
 
-3. **Types** (`src/types/`)
+3. **Converters** (`src/converters/`)
+   - `comparison.ts` - Handles comparison operations with nested field support
+   - `methods.ts` - OData method calls (contains, startswith, etc.)
+   - `date.ts` - Date handling and optimization
+   - `index.ts` - Main conversion entry point with enhanced fallback parsing
+
+4. **Types** (`src/types/`)
    - `index.ts` - Core type definitions
    - `odata-query.ts` - OData query parameter types
+   - `schema.ts` - Schema validation types and interfaces
 
-4. **Utils** (`src/utils/`)
+5. **Utils** (`src/utils/`)
    - `helpers.ts` - General utility functions
-   - `optimizer.ts` - Query optimization functions
-   - `fallback.ts` - Fallback parsing for edge cases
-   - `odata-parser.ts` - OData parameter parsing utilities
+   - `odata-parser.ts` - Standard OData parameter parsing
+   - `nested-parser.ts` - Enhanced nested navigation parsing
+   - `schema-validator.ts` - Zod schema validation utilities
+   - `field-path.ts` - Nested field path handling
+   - `fallback.ts` - Enhanced fallback parsing with nested support
 
-5. **Enums** (`src/enums/`)
-   - Defines all supported node types, operators, and ORM types
+## 🎯 OData v4 Nested Query Support
+
+### Supported Navigation Syntax
+```typescript
+// Basic navigation
+$filter=Category/Name eq 'Electronics'
+
+// Multi-level navigation  
+$filter=Order/Customer/Address/City eq 'Seattle'
+
+// Collection navigation with any/all
+$filter=Orders/any(o: o/Total gt 100)
+$filter=Products/all(p: p/Price lt 50)
+
+// Complex nested selections
+$select=name,profile(avatar,address(city,country)),orders(total,status)
+```
+
+### Schema Validation with Zod
+```typescript
+import { z } from 'zod';
+import { PrismaQueryBuilder } from 'odata2orm';
+
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  profile: z.object({
+    avatar: z.string(),
+    address: z.object({
+      city: z.string(),
+      country: z.string()
+    })
+  }),
+  orders: z.array(z.object({
+    total: z.number(),
+    status: z.string()
+  }))
+});
+
+const builder = new PrismaQueryBuilder({
+  schema: UserSchema,
+  enableNestedQueries: true,
+  allowAllFields: false
+});
+```
+
+### Implementation Requirements
+- **Navigation Path Parsing**: Handle `/` delimited property paths
+- **Lambda Expression Support**: Parse `any()/all()` with variable binding
+- **Schema Validation**: Validate paths against Zod schema structure
+- **Nested Prisma Generation**: Convert to proper nested where/select clauses
+- **Type Safety**: Full TypeScript support with schema inference
 
 ## Coding Guidelines
 
@@ -146,24 +196,34 @@ function paginateData<T>(
 }
 ```
 
-### Advanced Usage with Abstract Base Class
+### Schema-Validated Nested Queries (NEW!)
 ```typescript
-import { BaseQueryBuilder, BaseQueryOptions } from 'odata2orm';
+import { z } from 'zod';
+import { PrismaQueryBuilder, PrismaQueryBuilderOptions } from 'odata2orm';
 
-class CustomOrmQueryBuilder extends BaseQueryBuilder<CustomQueryOptions> {
-  protected createEmptyQuery(): CustomQueryOptions { return {}; }
-  protected setTake(query: CustomQueryOptions, take: number): void { query.limit = take; }
-  protected setSkip(query: CustomQueryOptions, skip: number): void { query.offset = skip; }
-  protected setOrderBy(query: CustomQueryOptions, orderBy: Record<string, 'asc' | 'desc'>): void {
-    query.sort = Object.entries(orderBy).map(([field, dir]) => ({ [field]: dir }));
-  }
-  protected setSelect(query: CustomQueryOptions, select: Record<string, any>): void {
-    query.fields = Object.keys(select);
-  }
-  protected createCountQuery(findQuery: CustomQueryOptions): CustomQueryOptions {
-    return { where: findQuery.where };
-  }
-}
+const UserSchema = z.object({
+  id: z.string(),
+  profile: z.object({
+    avatar: z.string(),
+    address: z.object({ city: z.string() })
+  }),
+  orders: z.array(z.object({ total: z.number() }))
+});
+
+const options: PrismaQueryBuilderOptions = {
+  schema: UserSchema,
+  enableNestedQueries: true,
+  allowAllFields: false
+};
+
+const builder = new PrismaQueryBuilder(options);
+
+// Supports nested navigation and validation
+const query = builder.buildQuery({
+  $filter: "profile/address/city eq 'Seattle' and orders/any(o: o/total gt 100)",
+  $select: "id,profile(avatar,address(city)),orders(total)",
+  $orderby: "profile/address/city desc"
+});
 ```
 
 ## Testing Guidelines
@@ -181,6 +241,7 @@ class CustomOrmQueryBuilder extends BaseQueryBuilder<CustomQueryOptions> {
 - `tests/comprehensive.test.ts` - Core functionality
 - `tests/integration.test.ts` - End-to-end scenarios
 - `tests/caseSensitive.test.ts` - Case sensitivity handling
+- `tests/nested-schema.test.ts` - Schema validation and nested queries (NEW!)
 
 ### Test Patterns
 ```typescript
@@ -227,91 +288,3 @@ describe('Feature Name', () => {
 - Minimize database queries with efficient pagination
 - Cache parsing results where appropriate
 - Profile complex filter expressions
-
-## Dependencies
-
-### Runtime Dependencies
-- `odata-v4-parser` - OData expression parsing
-
-### Development Dependencies
-- TypeScript - Language and compiler
-- Jest - Testing framework
-- ts-node - TypeScript execution
-- rimraf - Clean build artifacts
-
-## Build and Release
-
-### Scripts
-```bash
-pnpm run build        # Clean and compile
-pnpm run test         # Run all tests
-pnpm run test:coverage # Run tests with coverage
-pnpm run lint         # Type checking
-pnpm run clean        # Clean build artifacts
-```
-
-### Release Process
-1. Update version in package.json
-2. Update CHANGELOG.md
-3. Run full test suite
-4. Build and verify dist/
-5. Publish to npm
-
-## Documentation
-
-### Key Files
-- `README.md` - Main documentation
-- `PAGINATION.md` - Detailed pagination guide
-- `DEVELOPMENT.md` - Development setup
-- Examples in `examples/` directory
-
-### Documentation Standards
-- Provide code examples for all features
-- Include both simple and complex use cases
-- Document breaking changes clearly
-- Maintain API reference documentation
-
-## Future Roadmap
-
-### Planned Features
-- TypeORM adapter implementation
-- Sequelize adapter implementation  
-- Mongoose adapter implementation
-- Advanced query optimization
-- Nested field filtering improvements
-- GraphQL integration
-
-### Architecture Improvements
-- Plugin system for custom converters
-- Configuration management
-- Better error reporting
-- Performance monitoring
-
-## Common Issues and Solutions
-
-### OData Parsing Issues
-- Use fallback parser for edge cases
-- Validate input before parsing
-- Provide meaningful error messages
-
-### Type Safety
-- Export all relevant types
-- Use proper generics for flexibility
-- Maintain strict TypeScript compliance
-
-### Performance
-- Profile complex queries
-- Optimize OR conditions to IN operations
-- Use efficient pagination patterns
-
-## Contributing Guidelines
-
-When contributing code:
-1. Follow existing code style and patterns
-2. Add comprehensive tests for new features
-3. Update documentation accordingly
-4. Maintain backward compatibility
-5. Use meaningful commit messages
-6. Add appropriate type definitions
-
-This project follows semantic versioning and maintains high code quality standards.
