@@ -6,7 +6,7 @@ import { ODataNode, ComparisonType } from '../types';
 import { NodeType, ODataMethod, ComparisonSymbol, LiteralType } from '../enums';
 
 /**
- * Get field name from AST - with support for nested method calls
+ * Get field name from AST - with support for nested method calls and navigation paths
  */
 export function getFieldName(expr: ODataNode): string {
   if (!expr || !expr.type) {
@@ -17,6 +17,20 @@ export function getFieldName(expr: ODataNode): string {
     case NodeType.FIRST_MEMBER_EXPRESSION:
     case NodeType.MEMBER_EXPRESSION:
     case NodeType.PROPERTY_PATH_EXPRESSION:
+      // Handle nested navigation paths
+      if (expr.value && expr.value.current) {
+        const path: string[] = [];
+        let current = expr.value.current;
+        while (current) {
+          if (current.type === NodeType.ODATA_IDENTIFIER) {
+            path.unshift(current.value.name);
+          } else if (current.value && current.value.name) {
+            path.unshift(current.value.name);
+          }
+          current = current.value ? current.value.next : null;
+        }
+        return path.join('/');
+      }
       return getFieldName(expr.value);
     case NodeType.ODATA_IDENTIFIER:
       return expr.value.name;

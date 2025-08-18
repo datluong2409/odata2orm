@@ -27,7 +27,7 @@
     "odata",
     "orm",
     "prisma",
-    "typeorm", 
+    "typeorm",
     "sequelize",
     "mongoose",
     "filter",
@@ -52,7 +52,8 @@
   },
   "homepage": "https://github.com/datluong2409/odata2orm#readme",
   "dependencies": {
-    "odata-v4-parser": "^0.1.29"
+    "odata-v4-parser": "^0.1.29",
+    "zod": "^4.0.17"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

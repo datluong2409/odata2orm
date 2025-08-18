@@ -22,6 +22,17 @@ export type {
   ParsedSelect 
 } from './types/odata-query';
 
+// Export schema validation types
+export type {
+  SchemaValidationOptions,
+  NestedFieldPath,
+  ParsedNestedSelect,
+  ValidationResult,
+  CollectionFilter,
+  SchemaFieldInfo,
+  SchemaMap
+} from './types/schema';
+
 // Legacy API - Keep for backward compatibility (defaults to Prisma)
 export { convert } from './converters';
 export { convert as default } from './converters';
@@ -29,9 +40,10 @@ export { convert as default } from './converters';
 // Convenience exports for easy usage
 export { AdapterFactory as ODataConverter } from './adapters/factory';
 
-// Export new Prisma Query Builder
+// Export new Prisma Query Builder with schema support
 export { 
   PrismaQueryBuilder, 
+  PrismaQueryBuilderOptions,
   createPrismaQuery, 
   createPrismaPaginationQuery 
 } from './adapters/prisma-query-builder';
@@ -62,6 +74,18 @@ export {
 // Export OData parser utilities
 export { parseOrderBy, parseSelect, calculatePagination } from './utils/odata-parser';
 
+// Export enhanced nested parsing utilities
+export { 
+  parseNestedSelect, 
+  parseNestedOrderBy, 
+  parseCollectionFilters,
+  convertNestedSelectToPrisma,
+  convertCollectionFilterToPrisma
+} from './utils/nested-parser';
+
+// Export schema validation utilities
+export { SchemaValidator, parseNavigationPath, parseCollectionFilter } from './utils/schema-validator';
+
 /**
  * Quick convert function for Prisma (backward compatibility)
  * @param odataFilterString - OData filter string
@@ -71,7 +95,7 @@ export { parseOrderBy, parseSelect, calculatePagination } from './utils/odata-pa
 import { AdapterFactory } from './adapters/factory';
 import { SupportedOrm } from './enums';
 import { ODataQueryParams } from './types/odata-query';
-import { createPrismaQuery, createPrismaPaginationQuery } from './adapters/prisma-query-builder';
+import { PrismaQueryBuilderOptions, createPrismaQuery, createPrismaPaginationQuery } from './adapters/prisma-query-builder';
 import { createTypeOrmQuery, createTypeOrmPaginationQuery } from './adapters/typeorm-query-builder';
 import { createSequelizeQuery, createSequelizePaginationQuery } from './adapters/sequelize-query-builder';
 import { createMongooseQuery, createMongoosePaginationQuery } from './adapters/mongoose-query-builder';
@@ -112,22 +136,22 @@ export function convertToMongoose(odataFilterString: string, options = {}) {
 }
 
 /**
- * Build complete Prisma query from OData parameters
+ * Build complete Prisma query from OData parameters with schema validation
  * @param params - OData query parameters ($filter, $top, $skip, $orderby, $select)
- * @param options - Conversion options
+ * @param options - Conversion and schema validation options
  * @returns Prisma query options
  */
-export function buildPrismaQuery(params: ODataQueryParams, options = {}) {
+export function buildPrismaQuery(params: ODataQueryParams, options: PrismaQueryBuilderOptions = {}) {
   return createPrismaQuery(params, options);
 }
 
 /**
- * Build Prisma pagination query from OData parameters
+ * Build Prisma pagination query from OData parameters with schema validation
  * @param params - OData query parameters
- * @param options - Conversion options
+ * @param options - Conversion and schema validation options
  * @returns Object with findQuery and countQuery for pagination
  */
-export function buildPrismaPagination(params: ODataQueryParams, options = {}) {
+export function buildPrismaPagination(params: ODataQueryParams, options: PrismaQueryBuilderOptions = {}) {
   return createPrismaPaginationQuery(params, options);
 }
 

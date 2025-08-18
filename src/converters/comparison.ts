@@ -12,6 +12,7 @@ import {
   ArithmeticOperator
 } from '../types';
 import { getFieldName, getLiteralValue, getComparisonSymbol } from '../utils/helpers';
+import { extractFieldPath, buildNestedWhere, normalizeFieldPath } from '../utils/field-path';
 import { NodeType, ODataMethod, ComparisonOperator as ComparisonOperatorEnum, PrismaStringMode } from '../enums';
 
 /**
@@ -37,7 +38,9 @@ export function handleComparison(node: ComparisonNode, options: ConversionOption
   }
   
   // Basic field comparison
-  const field = getFieldName(left);
+  const fieldPath = extractFieldPath(left);
+  const normalizedPath = normalizeFieldPath(fieldPath, options);
+  const field = normalizedPath.length > 0 ? normalizedPath.join('.') : getFieldName(left);
   const value = getLiteralValue(right);
   
   const operatorMap: Record<ComparisonType, ComparisonOperator> = {
@@ -56,10 +59,12 @@ export function handleComparison(node: ComparisonNode, options: ConversionOption
   
   // Handle null values
   if (value === null) {
-    return operator === ComparisonOperatorEnum.EQUALS ? { [field]: null } : { [field]: { not: null } };
+    const condition = operator === ComparisonOperatorEnum.EQUALS ? null : { not: null };
+    return normalizedPath.length > 1 ? buildNestedWhere(normalizedPath, condition) : { [field]: condition };
   }
   
-  return { [field]: { [operator]: value } };
+  const condition = { [operator]: value };
+  return normalizedPath.length > 1 ? buildNestedWhere(normalizedPath, condition) : { [field]: condition };
 }
 
 /**
