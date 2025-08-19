@@ -233,7 +233,7 @@ describe('Nested Select Parser', () => {
   });
 
   it('should validate against schema when provided', () => {
-    const options = { schema: UserProfileSchema };
+    const options = { schema: UserProfileSchema, allowAllFields: false };
     
     expect(() => {
       parseNestedSelect('id,name,profile/avatar', options);
@@ -241,7 +241,7 @@ describe('Nested Select Parser', () => {
 
     expect(() => {
       parseNestedSelect('id,invalidField', options);
-    }).toThrow('Invalid field path');
+    }).toThrow('Schema validation failed for $select');
   });
 
   it('should allow all fields when allowAllFields is true', () => {
@@ -283,7 +283,7 @@ describe('Nested OrderBy Parser', () => {
   });
 
   it('should validate against schema when provided', () => {
-    const options = { schema: UserProfileSchema };
+    const options = { schema: UserProfileSchema, allowAllFields: false };
     
     expect(() => {
       parseNestedOrderBy('name asc, profile/avatar desc', options);
@@ -291,7 +291,7 @@ describe('Nested OrderBy Parser', () => {
 
     expect(() => {
       parseNestedOrderBy('invalidField asc', options);
-    }).toThrow('Invalid orderby field');
+    }).toThrow('Schema validation failed for $orderby');
   });
 });
 
@@ -422,7 +422,7 @@ describe('PrismaQueryBuilder with Schema Support', () => {
       builder.buildQuery({
         $select: "id,invalidField"
       });
-    }).toThrow('Invalid field path');
+    }).toThrow('Schema validation failed for $select');
   });
 
   it('should handle collection filters in query building', () => {

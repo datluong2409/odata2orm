@@ -10,6 +10,7 @@ import {
   NestedFieldPath,
   CollectionFilter 
 } from '../types/schema';
+import { SchemaValidationError } from '../errors';
 
 export class SchemaValidator {
   private schemaMap: SchemaMap;
@@ -28,15 +29,17 @@ export class SchemaValidator {
       const shape = schema.shape;
       for (const [key, fieldSchema] of Object.entries(shape)) {
         const fullPath = prefix ? `${prefix}.${key}` : key;
+        const unwrappedSchema = this.unwrapSchema(fieldSchema);
         map[fullPath] = this.getFieldInfo(fieldSchema);
         
         // Recursively process nested objects
-        if (fieldSchema instanceof z.ZodObject) {
-          Object.assign(map, this.buildSchemaMap(fieldSchema, fullPath));
-        } else if (fieldSchema instanceof z.ZodArray) {
-          const itemSchema = fieldSchema.element;
-          if (itemSchema instanceof z.ZodObject) {
-            Object.assign(map, this.buildSchemaMap(itemSchema, fullPath));
+        if (unwrappedSchema instanceof z.ZodObject) {
+          Object.assign(map, this.buildSchemaMap(unwrappedSchema, fullPath));
+        } else if (unwrappedSchema instanceof z.ZodArray) {
+          const itemSchema = unwrappedSchema.element;
+          const unwrappedItemSchema = this.unwrapSchema(itemSchema);
+          if (unwrappedItemSchema instanceof z.ZodObject) {
+            Object.assign(map, this.buildSchemaMap(unwrappedItemSchema, fullPath));
           }
         }
       }
@@ -46,32 +49,41 @@ export class SchemaValidator {
   }
 
   /**
+   * Unwrap optional, nullable, and other wrapper schemas to get the core schema
+   */
+  private unwrapSchema(schema: any): any {
+    let current = schema;
+    while (current instanceof z.ZodOptional || current instanceof z.ZodNullable || current instanceof z.ZodDefault) {
+      current = current.unwrap();
+    }
+    return current;
+  }
+
+  /**
    * Get field information from Zod schema
    */
   private getFieldInfo(schema: any): SchemaFieldInfo {
-    if (schema instanceof z.ZodObject) {
+    const unwrapped = this.unwrapSchema(schema);
+    
+    if (unwrapped instanceof z.ZodObject) {
       const fields: Record<string, SchemaFieldInfo> = {};
-      for (const [key, fieldSchema] of Object.entries(schema.shape)) {
+      for (const [key, fieldSchema] of Object.entries(unwrapped.shape)) {
         fields[key] = this.getFieldInfo(fieldSchema);
       }
       return { type: 'object', fields };
     }
     
-    if (schema instanceof z.ZodArray) {
+    if (unwrapped instanceof z.ZodArray) {
       return { 
         type: 'array', 
-        itemType: this.getFieldInfo(schema.element) 
+        itemType: this.getFieldInfo(unwrapped.element) 
       };
     }
     
-    if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
-      return { 
-        ...this.getFieldInfo(schema.unwrap()), 
-        nullable: true 
-      };
-    }
+    // Check if the original schema was optional/nullable
+    const nullable = schema instanceof z.ZodOptional || schema instanceof z.ZodNullable;
     
-    return { type: 'scalar' };
+    return { type: 'scalar', nullable };
   }
 
   /**
@@ -144,6 +156,30 @@ export class SchemaValidator {
       const fieldInfo = this.schemaMap[path];
       return fieldInfo.type === 'scalar' || fieldInfo.type === 'array';
     });
+  }
+
+  /**
+   * Validate field path and throw error if invalid (when schema validation is strict)
+   */
+  validateFieldPathStrict(
+    path: string[], 
+    operation: 'filter' | 'select' | 'orderby' = 'filter'
+  ): void {
+    const validation = this.validateFieldPath(path);
+    if (!validation.isValid && validation.error) {
+      throw new SchemaValidationError(
+        `Schema validation failed for $${operation}: ${validation.error}`,
+        path.join('/'),
+        operation
+      );
+    }
+  }
+
+  /**
+   * Check if strict validation is enabled (has schema and not allowing all fields)
+   */
+  isStrictValidationEnabled(allowAllFields?: boolean): boolean {
+    return Object.keys(this.schemaMap).length > 0 && allowAllFields === false;
   }
 }
 

@@ -17,6 +17,7 @@ import {
   parseNavigationPath, 
   parseCollectionFilter 
 } from './schema-validator';
+import { SchemaValidationError } from '../errors';
 
 /**
  * Parse OData $select with nested navigation support
@@ -24,7 +25,8 @@ import {
  */
 export function parseNestedSelect(
   selectString: string, 
-  options: SchemaValidationOptions = {}
+  options: SchemaValidationOptions = {},
+  contextPath: string[] = []
 ): ParsedNestedSelect {
   if (!selectString) return {};
 
@@ -43,28 +45,24 @@ export function parseNestedSelect(
     if (nestedMatch) {
       const [, basePath, nestedFields] = nestedMatch;
       const pathParts = basePath.split('/');
+      const fullPath = [...contextPath, ...pathParts];
       
-      // Validate path if schema is provided
-      if (options.schema && !options.allowAllFields) {
-        const validation = validator.validateFieldPath(pathParts);
-        if (!validation.isValid) {
-          throw new Error(`Invalid field path '${basePath}': ${validation.error}`);
-        }
+      // Validate path if schema is provided and strict validation is enabled
+      if (validator.isStrictValidationEnabled(options.allowAllFields)) {
+        validator.validateFieldPathStrict(fullPath, 'select');
       }
 
-      // Recursively parse nested fields
-      const nestedSelect = parseNestedSelect(nestedFields, options);
+      // Recursively parse nested fields with the current path as context
+      const nestedSelect = parseNestedSelect(nestedFields, options, fullPath);
       setNestedValue(result, pathParts, nestedSelect);
     } else {
       // Simple field or navigation path: "name" or "profile/avatar"
       const pathParts = trimmedField.split('/');
+      const fullPath = [...contextPath, ...pathParts];
       
-      // Validate path if schema is provided
-      if (options.schema && !options.allowAllFields) {
-        const validation = validator.validateFieldPath(pathParts);
-        if (!validation.isValid) {
-          throw new Error(`Invalid field path '${trimmedField}': ${validation.error}`);
-        }
+      // Validate path if schema is provided and strict validation is enabled
+      if (validator.isStrictValidationEnabled(options.allowAllFields)) {
+        validator.validateFieldPathStrict(fullPath, 'select');
       }
 
       setNestedValue(result, pathParts, true);
@@ -151,13 +149,10 @@ export function parseNestedOrderBy(
     const fieldPath = parts[0];
     const direction = (parts[1]?.toLowerCase() === 'desc') ? 'desc' : 'asc';
 
-    // Validate path if schema is provided
-    if (options.schema && !options.allowAllFields) {
+    // Validate path if schema is provided and strict validation is enabled
+    if (validator.isStrictValidationEnabled(options.allowAllFields)) {
       const pathParts = fieldPath.split('/');
-      const validation = validator.validateFieldPath(pathParts);
-      if (!validation.isValid) {
-        throw new Error(`Invalid orderby field '${fieldPath}': ${validation.error}`);
-      }
+      validator.validateFieldPathStrict(pathParts, 'orderby');
     }
 
     // For now, flatten the path for orderBy (ORM-specific handling will be in query builders)
@@ -171,9 +166,13 @@ export function parseNestedOrderBy(
 /**
  * Parse collection filters (any/all expressions)
  */
-export function parseCollectionFilters(filterString: string): CollectionFilter[] {
+export function parseCollectionFilters(
+  filterString: string, 
+  options: SchemaValidationOptions = {}
+): CollectionFilter[] {
   if (!filterString) return [];
 
+  const validator = new SchemaValidator(options.schema);
   const filters: CollectionFilter[] = [];
   
   // Simple regex to find any/all expressions
@@ -182,12 +181,27 @@ export function parseCollectionFilters(filterString: string): CollectionFilter[]
 
   while ((match = anyAllRegex.exec(filterString)) !== null) {
     const [, pathStr, type, variable, condition] = match;
+    const pathParts = pathStr.split('/');
+    
+    // Validate collection path if schema is provided and strict validation is enabled
+    if (validator.isStrictValidationEnabled(options.allowAllFields)) {
+      validator.validateFieldPathStrict(pathParts, 'filter');
+      
+      // Also validate that this is actually a collection
+      if (!validator.isCollectionPath(pathParts)) {
+        throw new SchemaValidationError(
+          `Schema validation failed for $filter: Field '${pathStr}' is not a collection and cannot be used with ${type}()`,
+          pathStr,
+          'filter'
+        );
+      }
+    }
     
     filters.push({
       type: type as 'any' | 'all',
       variable,
       condition,
-      path: pathStr.split('/')
+      path: pathParts
     });
   }
 

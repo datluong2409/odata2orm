@@ -16,6 +16,7 @@ import {
   convertCollectionFilterToPrisma
 } from '../utils/nested-parser';
 import { SchemaValidator } from '../utils/schema-validator';
+import { validateFilterFieldPaths } from '../utils/filter-field-extractor';
 
 // Re-export for convenience
 export { PrismaQueryOptions } from '../types/odata-query';
@@ -49,11 +50,14 @@ export class PrismaQueryBuilder extends BaseQueryBuilder<PrismaQueryOptions> {
 
     // Handle $filter with nested navigation and collection filters
     if (params.$filter) {
+      // Validate filter field paths if schema validation is strict
+      validateFilterFieldPaths(params.$filter, this.schemaOptions);
+      
       const baseWhere = this.adapter.convert(params.$filter);
       
       if (this.enableNestedQueries) {
-        // Parse and handle collection filters (any/all)
-        const collectionFilters = parseCollectionFilters(params.$filter);
+        // Parse and handle collection filters (any/all) with schema validation
+        const collectionFilters = parseCollectionFilters(params.$filter, this.schemaOptions);
         
         if (collectionFilters.length > 0) {
           const collectionWheres = collectionFilters.map(filter => 

@@ -9,6 +9,9 @@ export * from './adapters';
 // Export enums for better type safety
 export * from './enums';
 
+// Export error classes
+export * from './errors';
+
 // Export legacy types for backward compatibility (excluding conflicts)
 export type { ODataNode, MethodCallNode, ComparisonNode, LogicalNode, LiteralNode, FieldNode } from './types';
 
