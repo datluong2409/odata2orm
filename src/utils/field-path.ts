@@ -19,20 +19,32 @@ export function extractFieldPath(node: any): string[] {
   if (node.type === 'PropertyPathExpression' || node.type === 'MemberExpression') {
     const path: string[] = [];
     
-    if (node.value && node.value.current) {
+    // Check for nested structure with .value.current
+    const targetValue = node.value?.value || node.value;
+    
+    if (targetValue && targetValue.current) {
       // Multi-level navigation: user/profile/name
-      let current = node.value.current;
-      while (current) {
-        if (current.type === 'ODataIdentifier') {
-          path.unshift(current.value.name);
-        } else if (current.value && current.value.name) {
-          path.unshift(current.value.name);
+      path.push(targetValue.current.value.name);
+      
+      // Traverse the next chain
+      let next = targetValue.next;
+      while (next) {
+        if (next.type === 'SingleNavigationExpression' && next.value) {
+          // Extract field from nested navigation
+          const nestedPath = extractFieldPath(next.value);
+          path.push(...nestedPath);
+          break;
+        } else if (next.value && next.value.name) {
+          path.push(next.value.name);
         }
-        current = current.value ? current.value.next : null;
+        next = next.value ? next.value.next : null;
       }
-    } else if (node.value && node.value.name) {
+    } else if (targetValue && targetValue.value && targetValue.value.name) {
+      // Simple field from nested value
+      path.push(targetValue.value.name);
+    } else if (targetValue && targetValue.name) {
       // Simple field
-      path.push(node.value.name);
+      path.push(targetValue.name);
     }
 
     return path;
@@ -40,8 +52,15 @@ export function extractFieldPath(node: any): string[] {
 
   // Handle first member expressions
   if (node.type === 'FirstMemberExpression') {
-    if (node.value && node.value.name) {
-      return [node.value.name];
+    if (node.value) {
+      return extractFieldPath(node.value);
+    }
+  }
+
+  // Handle single navigation expressions
+  if (node.type === 'SingleNavigationExpression') {
+    if (node.value) {
+      return extractFieldPath(node.value);
     }
   }
 
@@ -98,7 +117,7 @@ export function pathToDotNotation(path: string[]): string {
  * Normalize field path (handle case sensitivity, aliases, etc.)
  */
 export function normalizeFieldPath(path: string[], options: any = {}): string[] {
-  if (!options.caseSensitive) {
+  if (options.caseSensitive === false) {
     return path.map(p => p.toLowerCase());
   }
   return path;

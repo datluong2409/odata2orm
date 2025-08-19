@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { buildPrismaPagination, SchemaValidationError } from '../src';
+import { buildPrismaPagination, SchemaValidationError } from '../dist';
 
 // Define a schema for a User entity
 const UserSchema = z.object({
