@@ -378,13 +378,10 @@ describe('OData to ORM Converter - Comprehensive Tests', () => {
     test('Should convert to different ORMs without errors', () => {
       const odataFilter = "Name eq 'John' and Age gt 25";
 
-      // Prisma + TypeORM are implemented
       expect(() => convertToPrisma(odataFilter)).not.toThrow();
       expect(() => convertToTypeORM(odataFilter)).not.toThrow();
-
-      // Sequelize + Mongoose still pending
-      expect(() => convertToSequelize(odataFilter)).toThrow(/coming soon/);
-      expect(() => convertToMongoose(odataFilter)).toThrow(/coming soon/);
+      expect(() => convertToSequelize(odataFilter)).not.toThrow();
+      expect(() => convertToMongoose(odataFilter)).not.toThrow();
     });
   });
 });

@@ -4,9 +4,15 @@
 
 import { BaseOrmAdapter, ConversionOptions, WhereClause, ComparisonNode, MethodCallNode } from './base';
 import { ODataNode } from '../types';
+import {
+  convertToMongooseWhere,
+  convertNode as convertNodeImpl,
+} from '../converters/mongoose';
+import { handleComparison as handleComparisonImpl } from '../converters/mongoose/comparison';
+import { handleMethod as handleMethodImpl } from '../converters/mongoose/methods';
 
 export interface MongooseWhereClause extends WhereClause {
-  // Mongoose specific types will be defined here
+  [key: string]: any;
 }
 
 export class MongooseAdapter extends BaseOrmAdapter {
@@ -15,54 +21,44 @@ export class MongooseAdapter extends BaseOrmAdapter {
   }
 
   /**
-   * Convert OData filter string to Mongoose where clause
+   * Convert OData filter string to a Mongoose / MongoDB filter object.
    */
   convert(odataFilterString: string): MongooseWhereClause {
-    throw new Error('Mongoose adapter is coming soon! Please stay tuned for updates.');
+    const result = convertToMongooseWhere(odataFilterString, this.options);
+    return result as MongooseWhereClause;
   }
 
-  /**
-   * Convert AST node to Mongoose filter
-   */
   convertNode(node: ODataNode): MongooseWhereClause {
-    throw new Error('Mongoose adapter is coming soon! Please stay tuned for updates.');
+    return convertNodeImpl(node, this.options) as MongooseWhereClause;
   }
 
-  /**
-   * Handle comparison operations
-   */
   handleComparison(node: ComparisonNode): MongooseWhereClause {
-    throw new Error('Mongoose adapter is coming soon! Please stay tuned for updates.');
+    return handleComparisonImpl(node, this.options) as MongooseWhereClause;
   }
 
-  /**
-   * Handle logical operations
-   */
   handleLogical(node: ODataNode): MongooseWhereClause {
-    throw new Error('Mongoose adapter is coming soon! Please stay tuned for updates.');
+    return convertNodeImpl(node, this.options) as MongooseWhereClause;
   }
 
-  /**
-   * Handle method calls
-   */
   handleMethod(node: MethodCallNode): MongooseWhereClause {
-    throw new Error('Mongoose adapter is coming soon! Please stay tuned for updates.');
+    return handleMethodImpl(node, this.options) as MongooseWhereClause;
   }
 
-  /**
-   * Get the ORM name
-   */
   getOrmName(): string {
     return 'Mongoose';
   }
 
-  /**
-   * Get supported features for Mongoose
-   */
   getSupportedFeatures(): string[] {
     return [
-      'Coming soon! This adapter is under development.',
-      'Will support: Basic comparisons, Logical operations, String methods, Date operations, MongoDB queries'
+      'Basic comparisons (=, !=, >, >=, <, <=) via MongoDB ops ($eq/$ne/$gt/$gte/$lt/$lte)',
+      'Logical operations (AND via merge / $and, OR via $or, NOT via $not / $nor / de Morgan)',
+      'String methods (contains, startsWith, endsWith) → $regex (with $options: "i" for caseSensitive=false)',
+      'Date operations (year, year+month, date range → { $gte: start, $lt: end })',
+      'IN expressions → $in',
+      'Null handling → { field: null } / { field: { $ne: null } }',
+      'Nested navigation paths → dot-notation keys (e.g. "profile.address.city")',
+      'Case sensitivity control (caseSensitive=false → regex /i)',
+      'Arithmetic in comparisons (algebraically rearranged)',
     ];
   }
 }

@@ -50,10 +50,7 @@ export class AdapterFactory {
       const adapter = this.createAdapter(orm);
       return {
         orm: adapter.getOrmName(),
-        status:
-          orm === SupportedOrm.PRISMA || orm === SupportedOrm.TYPEORM
-            ? OrmStatus.AVAILABLE
-            : OrmStatus.COMING_SOON,
+        status: OrmStatus.AVAILABLE,
         features: adapter.getSupportedFeatures()
       };
     });

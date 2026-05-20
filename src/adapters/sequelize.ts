@@ -4,9 +4,15 @@
 
 import { BaseOrmAdapter, ConversionOptions, WhereClause, ComparisonNode, MethodCallNode } from './base';
 import { ODataNode } from '../types';
+import {
+  convertToSequelizeWhere,
+  convertNode as convertNodeImpl,
+} from '../converters/sequelize';
+import { handleComparison as handleComparisonImpl } from '../converters/sequelize/comparison';
+import { handleMethod as handleMethodImpl } from '../converters/sequelize/methods';
 
 export interface SequelizeWhereClause extends WhereClause {
-  // Sequelize specific types will be defined here
+  [key: string]: any;
 }
 
 export class SequelizeAdapter extends BaseOrmAdapter {
@@ -15,54 +21,45 @@ export class SequelizeAdapter extends BaseOrmAdapter {
   }
 
   /**
-   * Convert OData filter string to Sequelize where clause
+   * Convert OData filter string to Sequelize where clause.
+   * Keys are field names; values use Sequelize Op symbols ({ [Op.eq]: v }, etc.).
    */
   convert(odataFilterString: string): SequelizeWhereClause {
-    throw new Error('Sequelize adapter is coming soon! Please stay tuned for updates.');
+    const result = convertToSequelizeWhere(odataFilterString, this.options);
+    return result as SequelizeWhereClause;
   }
 
-  /**
-   * Convert AST node to Sequelize filter
-   */
   convertNode(node: ODataNode): SequelizeWhereClause {
-    throw new Error('Sequelize adapter is coming soon! Please stay tuned for updates.');
+    return convertNodeImpl(node, this.options) as SequelizeWhereClause;
   }
 
-  /**
-   * Handle comparison operations
-   */
   handleComparison(node: ComparisonNode): SequelizeWhereClause {
-    throw new Error('Sequelize adapter is coming soon! Please stay tuned for updates.');
+    return handleComparisonImpl(node, this.options) as SequelizeWhereClause;
   }
 
-  /**
-   * Handle logical operations
-   */
   handleLogical(node: ODataNode): SequelizeWhereClause {
-    throw new Error('Sequelize adapter is coming soon! Please stay tuned for updates.');
+    return convertNodeImpl(node, this.options) as SequelizeWhereClause;
   }
 
-  /**
-   * Handle method calls
-   */
   handleMethod(node: MethodCallNode): SequelizeWhereClause {
-    throw new Error('Sequelize adapter is coming soon! Please stay tuned for updates.');
+    return handleMethodImpl(node, this.options) as SequelizeWhereClause;
   }
 
-  /**
-   * Get the ORM name
-   */
   getOrmName(): string {
     return 'Sequelize';
   }
 
-  /**
-   * Get supported features for Sequelize
-   */
   getSupportedFeatures(): string[] {
     return [
-      'Coming soon! This adapter is under development.',
-      'Will support: Basic comparisons, Logical operations, String methods, Date operations'
+      'Basic comparisons (=, !=, >, >=, <, <=) via Op symbols (eq/ne/gt/gte/lt/lte)',
+      'Logical operations (AND via merge / [Op.and], OR via [Op.or], NOT via [Op.not])',
+      'String methods (contains, startsWith, endsWith) → [Op.like] / [Op.iLike]',
+      'Date operations (year, year+month, date range → { [Op.gte]: start, [Op.lt]: end })',
+      'IN expressions → [Op.in]',
+      'Null handling → [Op.is] null / [Op.not] null',
+      'Nested navigation paths → dot-notation keys (use with include / $assoc.col$)',
+      'Case sensitivity control (caseSensitive=false → [Op.iLike])',
+      'Arithmetic in comparisons (algebraically rearranged)',
     ];
   }
 }
