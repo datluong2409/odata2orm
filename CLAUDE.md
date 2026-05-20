@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`odata2orm` is a TypeScript library that converts OData v4 query expressions (`$filter`, `$top`, `$skip`, `$orderby`, `$select`, `$count`) into ORM query objects. Prisma is fully implemented; TypeORM/Sequelize/Mongoose have query-builder scaffolding but their filter conversion (`adapter.convert()`) is not yet implemented.
+`odata2orm` is a TypeScript library that converts OData v4 query expressions (`$filter`, `$top`, `$skip`, `$orderby`, `$select`, `$count`) into ORM query objects. Prisma, TypeORM, Sequelize, and Mongoose adapters all implement `adapter.convert()` for filter conversion. Only Prisma has full nested-query/collection-filter support (`PrismaQueryBuilder` overrides `buildQuery`); the others provide pagination/select/orderBy via the base query builder but do not yet expand lambda expressions (`any`/`all`) or nested `$select` / `$orderby` paths.
 
 Package manager is **pnpm** (see `pnpm-lock.yaml`).
 
@@ -67,7 +67,7 @@ Adds `$top` / `$skip` / `$orderby` / `$select` / `$count` and pagination metadat
 - Routes `$filter` through `parseCollectionFilters` (`utils/nested-parser.ts`) to handle lambda expressions like `orders/any(o: o/total gt 100)` and merges them into `{ AND: [...] }` with the base where.
 - Uses `parseNestedOrderBy` and `parseNestedSelect` to expand `profile/address/city` and `profile(avatar,address(city))` into Prisma's nested `orderBy` / `select` shapes via `convertNestedSelectToPrisma`.
 
-Other ORMs do not (yet) override `buildQuery`, so their query builders work for pagination/select/orderBy but their `convert()` returns stubs.
+Other ORMs do not (yet) override `buildQuery`, so their query builders work for pagination/select/orderBy and their `convert()` returns a real where clause, but they do not expand OData lambda expressions (`any`/`all`) or nested navigation in `$select` / `$orderby`.
 
 ### Schema layer (`src/utils/schema-validator.ts`, `src/types/schema.ts`)
 

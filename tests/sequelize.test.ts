@@ -153,6 +153,12 @@ describe('Sequelize adapter — indexof', () => {
       Name: { [Op.notLike]: '%jo%' },
     });
   });
+
+  test('indexof(field, x) eq -1 with caseSensitive=false → Op.notILike', () => {
+    expect(convertToSequelize("indexof(Name, 'jo') eq -1", { caseSensitive: false })).toEqual({
+      Name: { [Op.notILike]: '%jo%' },
+    });
+  });
 });
 
 describe('SequelizeQueryBuilder', () => {

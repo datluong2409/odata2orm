@@ -10,10 +10,17 @@ import {
   ArithmeticOperator,
 } from '../../types';
 import { getFieldName, getLiteralValue, getComparisonSymbol } from '../../utils/helpers';
-import { extractFieldPath, buildNestedWhere, normalizeFieldPath } from '../../utils/field-path';
+import { buildNestedWhere } from '../../utils/field-path';
 import { NodeType, ODataMethod } from '../../enums';
 import { getTypeOrmOperators } from './operators';
 import { TypeOrmWhere } from './logical';
+import {
+  unwrapParens,
+  isArithmeticExpression,
+  computeAdjustedThreshold,
+  readArithmeticOperands,
+  resolveFieldPath,
+} from '../shared/comparison-prelude';
 
 type OperatorBuilder = (value: any) => any;
 
@@ -65,18 +72,10 @@ function handleNullComparison(path: string[], type: ComparisonType): TypeOrmWher
  * Handle comparison operators
  */
 export function handleComparison(node: ComparisonNode, options: ConversionOptions = {}): TypeOrmWhere {
-  let { left, right } = node.value;
+  const left = unwrapParens(node.value.left);
+  const right = node.value.right;
 
-  if (left.type === NodeType.PAREN_EXPRESSION || left.type === NodeType.BOOL_PAREN_EXPRESSION) {
-    left = left.value;
-  }
-
-  if (
-    left.type === NodeType.MUL_EXPRESSION ||
-    left.type === NodeType.DIV_EXPRESSION ||
-    left.type === NodeType.ADD_EXPRESSION ||
-    left.type === NodeType.SUB_EXPRESSION
-  ) {
+  if (isArithmeticExpression(left)) {
     return handleArithmeticComparison(node, left, right, options);
   }
 
@@ -84,9 +83,7 @@ export function handleComparison(node: ComparisonNode, options: ConversionOption
     return handleFunctionComparison(node, left, right, options);
   }
 
-  const fieldPath = extractFieldPath(left);
-  const normalizedPath = normalizeFieldPath(fieldPath, options);
-  const path = normalizedPath.length > 0 ? normalizedPath : [getFieldName(left)];
+  const path = resolveFieldPath(left, options);
   const value = getLiteralValue(right);
 
   if (value === null) {
@@ -104,30 +101,10 @@ export function handleArithmeticComparison(
   node: ComparisonNode,
   left: ODataNode,
   right: ODataNode,
-  options: ConversionOptions
+  _options: ConversionOptions
 ): TypeOrmWhere {
-  const field = getFieldName(left.value.left);
-  const operand = getLiteralValue(left.value.right);
-  const threshold = getLiteralValue(right);
-
-  let adjusted: number;
-  switch (left.type as ArithmeticOperator) {
-    case NodeType.MUL_EXPRESSION:
-      adjusted = threshold / operand;
-      break;
-    case NodeType.DIV_EXPRESSION:
-      adjusted = threshold * operand;
-      break;
-    case NodeType.ADD_EXPRESSION:
-      adjusted = threshold - operand;
-      break;
-    case NodeType.SUB_EXPRESSION:
-      adjusted = threshold + operand;
-      break;
-    default:
-      throw new Error(`Unsupported arithmetic operation: ${left.type}`);
-  }
-
+  const { field, operand, threshold } = readArithmeticOperands(left, right);
+  const adjusted = computeAdjustedThreshold(left.type as ArithmeticOperator, operand, threshold);
   const opBuilder = comparisonOperatorBuilder(node.type as ComparisonType);
   return { [field]: opBuilder(adjusted) };
 }

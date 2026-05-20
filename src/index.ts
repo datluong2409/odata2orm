@@ -109,7 +109,7 @@ export function convertToPrisma(odataFilterString: string, options = {}) {
 }
 
 /**
- * Convert to TypeORM (coming soon)
+ * Convert OData filter string to TypeORM `FindOptionsWhere`.
  * @param odataFilterString - OData filter string
  * @param options - Conversion options
  */
@@ -119,7 +119,7 @@ export function convertToTypeORM(odataFilterString: string, options = {}) {
 }
 
 /**
- * Convert to Sequelize (coming soon)
+ * Convert OData filter string to a Sequelize where clause (uses `Op` symbols).
  * @param odataFilterString - OData filter string
  * @param options - Conversion options
  */
@@ -129,7 +129,7 @@ export function convertToSequelize(odataFilterString: string, options = {}) {
 }
 
 /**
- * Convert to Mongoose (coming soon)
+ * Convert OData filter string to a Mongoose / MongoDB filter object.
  * @param odataFilterString - OData filter string
  * @param options - Conversion options
  */

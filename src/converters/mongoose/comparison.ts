@@ -10,10 +10,16 @@ import {
   ArithmeticOperator,
 } from '../../types';
 import { getFieldName, getLiteralValue, getComparisonSymbol } from '../../utils/helpers';
-import { extractFieldPath, normalizeFieldPath } from '../../utils/field-path';
 import { NodeType, ODataMethod } from '../../enums';
 import { MongoOps, escapeRegex } from './operators';
 import { MongoWhere } from './logical';
+import {
+  unwrapParens,
+  isArithmeticExpression,
+  computeAdjustedThreshold,
+  readArithmeticOperands,
+  resolveFieldPath,
+} from '../shared/comparison-prelude';
 
 function comparisonOperatorKey(type: ComparisonType): string {
   switch (type) {
@@ -49,18 +55,10 @@ function handleNullComparison(key: string, type: ComparisonType): MongoWhere {
 }
 
 export function handleComparison(node: ComparisonNode, options: ConversionOptions = {}): MongoWhere {
-  let { left, right } = node.value;
+  const left = unwrapParens(node.value.left);
+  const right = node.value.right;
 
-  if (left.type === NodeType.PAREN_EXPRESSION || left.type === NodeType.BOOL_PAREN_EXPRESSION) {
-    left = left.value;
-  }
-
-  if (
-    left.type === NodeType.MUL_EXPRESSION ||
-    left.type === NodeType.DIV_EXPRESSION ||
-    left.type === NodeType.ADD_EXPRESSION ||
-    left.type === NodeType.SUB_EXPRESSION
-  ) {
+  if (isArithmeticExpression(left)) {
     return handleArithmeticComparison(node, left, right, options);
   }
 
@@ -68,10 +66,7 @@ export function handleComparison(node: ComparisonNode, options: ConversionOption
     return handleFunctionComparison(node, left, right, options);
   }
 
-  const fieldPath = extractFieldPath(left);
-  const normalizedPath = normalizeFieldPath(fieldPath, options);
-  const path = normalizedPath.length > 0 ? normalizedPath : [getFieldName(left)];
-  const key = pathToKey(path);
+  const key = pathToKey(resolveFieldPath(left, options));
   const value = getLiteralValue(right);
 
   if (value === null) {
@@ -92,27 +87,8 @@ export function handleArithmeticComparison(
   right: ODataNode,
   _options: ConversionOptions
 ): MongoWhere {
-  const field = getFieldName(left.value.left);
-  const operand = getLiteralValue(left.value.right);
-  const threshold = getLiteralValue(right);
-
-  let adjusted: number;
-  switch (left.type as ArithmeticOperator) {
-    case NodeType.MUL_EXPRESSION:
-      adjusted = threshold / operand;
-      break;
-    case NodeType.DIV_EXPRESSION:
-      adjusted = threshold * operand;
-      break;
-    case NodeType.ADD_EXPRESSION:
-      adjusted = threshold - operand;
-      break;
-    case NodeType.SUB_EXPRESSION:
-      adjusted = threshold + operand;
-      break;
-    default:
-      throw new Error(`Unsupported arithmetic operation: ${left.type}`);
-  }
+  const { field, operand, threshold } = readArithmeticOperands(left, right);
+  const adjusted = computeAdjustedThreshold(left.type as ArithmeticOperator, operand, threshold);
 
   if (node.type === NodeType.EQUALS_EXPRESSION) {
     return { [field]: adjusted };

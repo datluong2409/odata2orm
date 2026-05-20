@@ -15,6 +15,7 @@ export interface SequelizeOps {
   like: symbol | string;
   iLike: symbol | string;
   notLike: symbol | string;
+  notILike: symbol | string;
   in: symbol | string;
   notIn: symbol | string;
   between: symbol | string;
@@ -37,6 +38,7 @@ const fallbackOps = (): SequelizeOps => ({
   like: Symbol.for('sequelize.op.like'),
   iLike: Symbol.for('sequelize.op.iLike'),
   notLike: Symbol.for('sequelize.op.notLike'),
+  notILike: Symbol.for('sequelize.op.notILike'),
   in: Symbol.for('sequelize.op.in'),
   notIn: Symbol.for('sequelize.op.notIn'),
   between: Symbol.for('sequelize.op.between'),
@@ -64,6 +66,7 @@ export function getSequelizeOps(): SequelizeOps {
       like: Op.like,
       iLike: Op.iLike,
       notLike: Op.notLike,
+      notILike: Op.notILike,
       in: Op.in,
       notIn: Op.notIn,
       between: Op.between,

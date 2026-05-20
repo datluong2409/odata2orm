@@ -4,7 +4,7 @@
  */
 
 import { ODataQueryParams, PrismaQueryOptions } from '../types/odata-query';
-import { SchemaValidationOptions, CollectionFilter } from '../types/schema';
+import { SchemaValidationOptions } from '../types/schema';
 import { PrismaAdapter } from '../adapters/prisma';
 import { BaseQueryBuilder } from './base-query-builder';
 import { ConversionOptions } from './base';
@@ -15,8 +15,8 @@ import {
   convertNestedSelectToPrisma,
   convertCollectionFilterToPrisma
 } from '../utils/nested-parser';
-import { SchemaValidator } from '../utils/schema-validator';
 import { validateFilterFieldPaths } from '../utils/filter-field-extractor';
+import { parseOrderBy, parseSelect } from '../utils/odata-parser';
 
 // Re-export for convenience
 export { PrismaQueryOptions } from '../types/odata-query';
@@ -28,18 +28,16 @@ export interface PrismaQueryBuilderOptions extends ConversionOptions, SchemaVali
 export class PrismaQueryBuilder extends BaseQueryBuilder<PrismaQueryOptions> {
   private schemaOptions: SchemaValidationOptions;
   private enableNestedQueries: boolean;
-  private validator: SchemaValidator;
 
   constructor(options: PrismaQueryBuilderOptions = {}) {
     const adapter = new PrismaAdapter(options);
     super(adapter);
-    
+
     this.schemaOptions = {
       schema: options.schema,
       allowAllFields: options.allowAllFields ?? true
     };
     this.enableNestedQueries = options.enableNestedQueries ?? true;
-    this.validator = new SchemaValidator(options.schema);
   }
 
   /**
@@ -98,8 +96,7 @@ export class PrismaQueryBuilder extends BaseQueryBuilder<PrismaQueryOptions> {
           this.setOrderBy(query, orderBy);
         }
       } else {
-        // Fall back to original parsing
-        const orderBy = this.parseOrderByLegacy(params.$orderby);
+        const orderBy = parseOrderBy(params.$orderby);
         if (Object.keys(orderBy).length > 0) {
           this.setOrderBy(query, orderBy);
         }
@@ -115,8 +112,7 @@ export class PrismaQueryBuilder extends BaseQueryBuilder<PrismaQueryOptions> {
           query.select = prismaSelect;
         }
       } else {
-        // Fall back to original parsing
-        const select = this.parseSelectLegacy(params.$select);
+        const select = parseSelect(params.$select);
         if (Object.keys(select).length > 0) {
           this.setSelect(query, select);
         }
@@ -124,39 +120,6 @@ export class PrismaQueryBuilder extends BaseQueryBuilder<PrismaQueryOptions> {
     }
 
     return query;
-  }
-
-  /**
-   * Legacy orderBy parsing for backward compatibility
-   */
-  private parseOrderByLegacy(orderByString: string): Record<string, 'asc' | 'desc'> {
-    const result: Record<string, 'asc' | 'desc'> = {};
-    const orderItems = orderByString.split(',').map(item => item.trim());
-
-    for (const item of orderItems) {
-      const parts = item.split(/\s+/);
-      const field = parts[0];
-      const direction = (parts[1]?.toLowerCase() === 'desc') ? 'desc' : 'asc';
-      result[field] = direction;
-    }
-
-    return result;
-  }
-
-  /**
-   * Legacy select parsing for backward compatibility
-   */
-  private parseSelectLegacy(selectString: string): Record<string, any> {
-    const result: Record<string, any> = {};
-    const fields = selectString.split(',').map(f => f.trim());
-    
-    for (const field of fields) {
-      if (field) {
-        result[field] = true;
-      }
-    }
-    
-    return result;
   }
 
   /**
@@ -196,17 +159,6 @@ export class PrismaQueryBuilder extends BaseQueryBuilder<PrismaQueryOptions> {
     query.select = select;
   }
 
-  /**
-   * Create a count query from a find query
-   * Count query should not include take, skip, select, orderBy
-   */
-  protected createCountQuery(findQuery: PrismaQueryOptions): PrismaQueryOptions {
-    const countQuery: PrismaQueryOptions = {};
-    if (findQuery.where) {
-      countQuery.where = findQuery.where;
-    }
-    return countQuery;
-  }
 }
 
 /**

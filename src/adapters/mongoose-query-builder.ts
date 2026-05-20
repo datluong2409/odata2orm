@@ -4,7 +4,7 @@
  */
 
 import { ODataQueryParams } from '../types/odata-query';
-import { MongooseAdapter } from '../adapters/mongoose';
+import { MongooseAdapter } from './mongoose';
 import { BaseQueryBuilder } from './base-query-builder';
 import { ConversionOptions } from './base';
 
@@ -68,32 +68,14 @@ export class MongooseQueryBuilder extends BaseQueryBuilder<MongooseQueryOptions>
   }
 
   /**
-   * Handle where clause for Mongoose (uses filter instead of where)
+   * Mongoose uses `filter` instead of `where`.
    */
-  buildQuery(params: ODataQueryParams): MongooseQueryOptions {
-    const query = super.buildQuery(params);
-    
-    // Move where to filter for Mongoose
-    if (query.where) {
-      query.filter = query.where;
-      delete query.where;
-    }
-    
-    return query;
+  protected setWhere(query: MongooseQueryOptions, where: any): void {
+    query.filter = where;
   }
 
-  /**
-   * Create a count query from a find query
-   * Count query should not include limit, skip, select, sort
-   */
-  protected createCountQuery(findQuery: MongooseQueryOptions): MongooseQueryOptions {
-    const countQuery: MongooseQueryOptions = {};
-    if (findQuery.filter) {
-      countQuery.filter = findQuery.filter;
-    } else if (findQuery.where) {
-      countQuery.filter = findQuery.where;
-    }
-    return countQuery;
+  protected getWhere(query: MongooseQueryOptions): any {
+    return query.filter;
   }
 
   /**

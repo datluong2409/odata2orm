@@ -68,18 +68,6 @@ export class SequelizeQueryBuilder extends BaseQueryBuilder<SequelizeQueryOption
   }
 
   /**
-   * Create a count query from a find query
-   * Count query should not include limit, offset, attributes, order
-   */
-  protected createCountQuery(findQuery: SequelizeQueryOptions): SequelizeQueryOptions {
-    const countQuery: SequelizeQueryOptions = {};
-    if (findQuery.where) {
-      countQuery.where = findQuery.where;
-    }
-    return countQuery;
-  }
-
-  /**
    * Helper method to flatten select object to array of field names
    * This handles the conversion from OData select format to Sequelize attributes
    */

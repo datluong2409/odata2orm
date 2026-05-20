@@ -68,18 +68,6 @@ export class TypeOrmQueryBuilder extends BaseQueryBuilder<TypeOrmQueryOptions> {
   }
 
   /**
-   * Create a count query from a find query
-   * Count query should not include take, skip, select, order
-   */
-  protected createCountQuery(findQuery: TypeOrmQueryOptions): TypeOrmQueryOptions {
-    const countQuery: TypeOrmQueryOptions = {};
-    if (findQuery.where) {
-      countQuery.where = findQuery.where;
-    }
-    return countQuery;
-  }
-
-  /**
    * Helper method to flatten select object to array of field names
    * This is a simplified implementation - TypeORM select can be more complex
    */

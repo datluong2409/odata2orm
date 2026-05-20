@@ -40,7 +40,7 @@ export abstract class BaseQueryBuilder<TQueryOptions extends BaseQueryOptions = 
 
     // Handle $filter
     if (params.$filter) {
-      query.where = this.adapter.convert(params.$filter);
+      this.setWhere(query, this.adapter.convert(params.$filter));
     }
 
     // Handle $top (limit)
@@ -143,7 +143,32 @@ export abstract class BaseQueryBuilder<TQueryOptions extends BaseQueryOptions = 
   protected abstract setSelect(query: TQueryOptions, select: Record<string, any>): void;
 
   /**
-   * Create a count query from a find query (typically removes take, skip, select, orderBy)
+   * Set the where clause on the query in ORM-specific format. Default uses `query.where`;
+   * override in adapters that use a different key (e.g. Mongoose uses `filter`).
    */
-  protected abstract createCountQuery(findQuery: TQueryOptions): TQueryOptions;
+  protected setWhere(query: TQueryOptions, where: any): void {
+    query.where = where;
+  }
+
+  /**
+   * Read the where clause from the query in ORM-specific format. Default reads `query.where`;
+   * override in adapters that use a different key.
+   */
+  protected getWhere(query: TQueryOptions): any {
+    return query.where;
+  }
+
+  /**
+   * Create a count query from a find query (typically removes take, skip, select, orderBy).
+   * Default implementation produces an empty query and copies the where clause via
+   * `setWhere` / `getWhere`. Override only if extra fields must be carried over.
+   */
+  protected createCountQuery(findQuery: TQueryOptions): TQueryOptions {
+    const countQuery = this.createEmptyQuery();
+    const where = this.getWhere(findQuery);
+    if (where !== undefined && where !== null) {
+      this.setWhere(countQuery, where);
+    }
+    return countQuery;
+  }
 }

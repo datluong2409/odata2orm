@@ -2,122 +2,97 @@
  * Comparison operation handlers
  */
 
-import { 
-  ODataNode, 
-  ComparisonNode, 
-  ConversionOptions, 
-  PrismaWhereClause, 
+import {
+  ODataNode,
+  ComparisonNode,
+  ConversionOptions,
+  PrismaWhereClause,
   ComparisonOperator,
   ComparisonType,
   ArithmeticOperator
 } from '../types';
 import { getFieldName, getLiteralValue, getComparisonSymbol } from '../utils/helpers';
-import { extractFieldPath, buildNestedWhere, normalizeFieldPath } from '../utils/field-path';
+import { buildNestedWhere } from '../utils/field-path';
 import { NodeType, ODataMethod, ComparisonOperator as ComparisonOperatorEnum, PrismaStringMode } from '../enums';
+import {
+  unwrapParens,
+  isArithmeticExpression,
+  computeAdjustedThreshold,
+  readArithmeticOperands,
+  resolveFieldPath,
+} from './shared/comparison-prelude';
 
 /**
  * Handle comparison operators
  */
-export function handleComparison(node: ComparisonNode, options: ConversionOptions = {}): PrismaWhereClause {
-  let { left, right } = node.value;
-  
-  // Unwrap parentheses
-  if (left.type === NodeType.PAREN_EXPRESSION || left.type === NodeType.BOOL_PAREN_EXPRESSION) {
-    left = left.value;
+const COMPARISON_OPERATORS: Record<ComparisonType, ComparisonOperator> = {
+  [NodeType.EQUALS_EXPRESSION]: ComparisonOperatorEnum.EQUALS,
+  [NodeType.NOT_EQUALS_EXPRESSION]: ComparisonOperatorEnum.NOT,
+  [NodeType.GREATER_THAN_EXPRESSION]: ComparisonOperatorEnum.GT,
+  [NodeType.GREATER_OR_EQUALS_EXPRESSION]: ComparisonOperatorEnum.GTE,
+  [NodeType.LESSER_THAN_EXPRESSION]: ComparisonOperatorEnum.LT,
+  [NodeType.LESSER_OR_EQUALS_EXPRESSION]: ComparisonOperatorEnum.LTE,
+};
+
+function buildPrismaField(path: string[], condition: any): PrismaWhereClause {
+  if (path.length > 1) {
+    return buildNestedWhere(path, condition);
   }
-  
-  // Handle arithmetic expressions
-  if (left.type === NodeType.MUL_EXPRESSION || left.type === NodeType.DIV_EXPRESSION || 
-      left.type === NodeType.ADD_EXPRESSION || left.type === NodeType.SUB_EXPRESSION) {
+  return { [path[0]]: condition };
+}
+
+export function handleComparison(node: ComparisonNode, options: ConversionOptions = {}): PrismaWhereClause {
+  const left = unwrapParens(node.value.left);
+  const right = node.value.right;
+
+  if (isArithmeticExpression(left)) {
     return handleArithmeticComparison(node, left, right, options);
   }
-  
-  // Handle function calls in comparison
+
   if (left.type === NodeType.METHOD_CALL_EXPRESSION) {
     return handleFunctionComparison(node, left, right, options);
   }
-  
-  // Basic field comparison
-  const fieldPath = extractFieldPath(left);
-  const normalizedPath = normalizeFieldPath(fieldPath, options);
-  const field = normalizedPath.length > 0 ? normalizedPath.join('.') : getFieldName(left);
+
+  const path = resolveFieldPath(left, options);
   const value = getLiteralValue(right);
-  
-  const operatorMap: Record<ComparisonType, ComparisonOperator> = {
-    [NodeType.EQUALS_EXPRESSION]: ComparisonOperatorEnum.EQUALS,
-    [NodeType.NOT_EQUALS_EXPRESSION]: ComparisonOperatorEnum.NOT,
-    [NodeType.GREATER_THAN_EXPRESSION]: ComparisonOperatorEnum.GT,
-    [NodeType.GREATER_OR_EQUALS_EXPRESSION]: ComparisonOperatorEnum.GTE,
-    [NodeType.LESSER_THAN_EXPRESSION]: ComparisonOperatorEnum.LT,
-    [NodeType.LESSER_OR_EQUALS_EXPRESSION]: ComparisonOperatorEnum.LTE
-  };
-  
-  const operator = operatorMap[node.type as ComparisonType];
+  const operator = COMPARISON_OPERATORS[node.type as ComparisonType];
   if (!operator) {
     throw new Error(`Unsupported comparison operator: ${node.type}`);
   }
-  
-  // Handle null values
+
   if (value === null) {
     const condition = operator === ComparisonOperatorEnum.EQUALS ? null : { not: null };
-    return normalizedPath.length > 1 ? buildNestedWhere(normalizedPath, condition) : { [field]: condition };
+    return buildPrismaField(path, condition);
   }
-  
-  const condition = { [operator]: value };
-  return normalizedPath.length > 1 ? buildNestedWhere(normalizedPath, condition) : { [field]: condition };
+
+  return buildPrismaField(path, { [operator]: value });
 }
 
 /**
  * Handle arithmetic expressions in comparison
  */
 export function handleArithmeticComparison(
-  node: ComparisonNode, 
-  left: ODataNode, 
-  right: ODataNode, 
-  options: ConversionOptions
+  node: ComparisonNode,
+  left: ODataNode,
+  right: ODataNode,
+  _options: ConversionOptions
 ): PrismaWhereClause {
-  const field = getFieldName(left.value.left);
-  const operand = getLiteralValue(left.value.right);
-  const threshold = getLiteralValue(right);
-  
-  const comparisonMap: Record<ComparisonType, string> = {
-    [NodeType.LESSER_THAN_EXPRESSION]: ComparisonOperatorEnum.LT,
-    [NodeType.LESSER_OR_EQUALS_EXPRESSION]: ComparisonOperatorEnum.LTE,
-    [NodeType.GREATER_THAN_EXPRESSION]: ComparisonOperatorEnum.GT,
-    [NodeType.GREATER_OR_EQUALS_EXPRESSION]: ComparisonOperatorEnum.GTE,
-    [NodeType.EQUALS_EXPRESSION]: ComparisonOperatorEnum.EQUALS,
-    [NodeType.NOT_EQUALS_EXPRESSION]: ComparisonOperatorEnum.NOT
-  };
-  
-  const op = comparisonMap[node.type as ComparisonType];
+  const { field, operand, threshold } = readArithmeticOperands(left, right);
+  const op = COMPARISON_OPERATORS[node.type as ComparisonType];
   if (!op) {
     throw new Error(`Unsupported arithmetic comparison: ${node.type}`);
   }
-  
-  let adjustedThreshold: number;
-  // Handle arithmetic with all comparison operators
-  switch (left.type as ArithmeticOperator) {
-    case NodeType.MUL_EXPRESSION:
-      adjustedThreshold = threshold / operand;
-      break;
-    case NodeType.DIV_EXPRESSION:
-      adjustedThreshold = threshold * operand;
-      break;
-    case NodeType.ADD_EXPRESSION:
-      adjustedThreshold = threshold - operand;
-      break;
-    case NodeType.SUB_EXPRESSION:
-      adjustedThreshold = threshold + operand;
-      break;
-    default:
-      throw new Error(`Unsupported arithmetic operation: ${left.type}`);
-  }
-  
-  // Special handling for NotEqualsExpression
+  const adjustedThreshold = computeAdjustedThreshold(
+    left.type as ArithmeticOperator,
+    operand,
+    threshold
+  );
+
+  // Prisma's NOT path wraps `{ not: { equals: ... } }` rather than a flat `{ not: value }`.
   if (op === ComparisonOperatorEnum.NOT) {
     return { [field]: { not: { equals: adjustedThreshold } } };
   }
-  
+
   return { [field]: { [op]: adjustedThreshold } };
 }
 

@@ -4,15 +4,12 @@
 
 import { BaseOrmAdapter, ConversionOptions, WhereClause, ComparisonNode, MethodCallNode } from './base';
 import { ODataNode } from '../types';
-import { preprocessODataFilter } from '../utils/helpers';
-import { optimizeOrToIn } from '../utils/optimizer';
-import { fallbackParser } from '../utils/fallback';
-import { handleComparison } from '../converters/comparison';
-import { handleMethod, handleInExpression } from '../converters/methods';
-import { tryHandleYearMonth, tryHandleDateRange, tryHandleYear } from '../converters/date';
-
-// Import the odata-v4-parser
-import * as odataParser from 'odata-v4-parser';
+import {
+  convert as convertToPrismaWhere,
+  convertNode as convertNodeImpl,
+} from '../converters';
+import { handleComparison as handleComparisonImpl } from '../converters/comparison';
+import { handleMethod as handleMethodImpl } from '../converters/methods';
 
 export interface PrismaWhereClause extends WhereClause {
   AND?: PrismaWhereClause[];
@@ -29,106 +26,35 @@ export class PrismaAdapter extends BaseOrmAdapter {
    * Convert OData filter string to Prisma where clause
    */
   convert(odataFilterString: string): PrismaWhereClause {
-    if (!odataFilterString || typeof odataFilterString !== 'string') {
-      return {};
-    }
-    
-    try {
-      // Pre-process the filter string
-      const preprocessed = preprocessODataFilter(odataFilterString);
-      const ast = odataParser.filter(preprocessed);
-      const result = this.convertNode(ast);
-      
-      // Post-process to optimize OR conditions into IN operations
-      return optimizeOrToIn(result);
-    } catch (error) {
-      // If parsing fails, try fallback parsing for special cases
-      try {
-        return fallbackParser(odataFilterString, this.options);
-      } catch (fallbackError) {
-        throw new Error(`Failed to parse OData filter: ${(error as Error).message}`);
-      }
-    }
+    return convertToPrismaWhere(odataFilterString, this.options) as PrismaWhereClause;
   }
 
   /**
    * Recursively convert AST node to Prisma filter
    */
   convertNode(node: ODataNode): PrismaWhereClause {
-    if (!node || !node.type) {
-      throw new Error('Invalid AST node');
-    }
-
-    switch (node.type) {
-      case 'EqualsExpression':
-      case 'NotEqualsExpression':
-      case 'GreaterThanExpression':
-      case 'GreaterOrEqualsExpression':
-      case 'LesserThanExpression':
-      case 'LesserOrEqualsExpression': {
-        // Check for single year handling first
-        const yearResult = tryHandleYear(node);
-        if (yearResult) return yearResult;
-        
-        return this.handleComparison(node as ComparisonNode);
-      }
-
-      case 'AndExpression': {
-        const left = node.value.left;
-        const right = node.value.right;
-        
-        // Handle special case: year + month
-        const yearMonth = tryHandleYearMonth(left, right) || tryHandleYearMonth(right, left);
-        if (yearMonth) return yearMonth;
-        
-        // Handle special case: date range
-        const dateRange = tryHandleDateRange(left, right) || tryHandleDateRange(right, left);
-        if (dateRange) return dateRange;
-        
-        return { AND: [this.convertNode(left), this.convertNode(right)] };
-      }
-
-      case 'OrExpression':
-        return { OR: [this.convertNode(node.value.left), this.convertNode(node.value.right)] };
-
-      case 'NotExpression':
-        return { NOT: this.convertNode(node.value) };
-
-      case 'MethodCallExpression':
-      case 'CommonExpression':
-        return this.handleMethod(node as MethodCallNode);
-
-      case 'ParenExpression':
-      case 'BoolParenExpression':
-        return this.convertNode(node.value);
-
-      case 'InExpression':
-        return handleInExpression(node, this.options);
-
-      default:
-        throw new Error(`Unsupported AST node type: ${node.type}`);
-    }
+    return convertNodeImpl(node, this.options) as PrismaWhereClause;
   }
 
   /**
    * Handle comparison operations
    */
   handleComparison(node: ComparisonNode): PrismaWhereClause {
-    return handleComparison(node, this.options);
+    return handleComparisonImpl(node, this.options);
   }
 
   /**
    * Handle logical operations
    */
   handleLogical(node: ODataNode): PrismaWhereClause {
-    return this.convertNode(node);
+    return convertNodeImpl(node, this.options) as PrismaWhereClause;
   }
 
   /**
    * Handle method calls
    */
   handleMethod(node: MethodCallNode): PrismaWhereClause {
-    return handleMethod(node, this.options);
+    return handleMethodImpl(node, this.options);
   }
 
   /**
