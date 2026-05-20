@@ -343,7 +343,7 @@ Auto-optimizations:
 }
 ```
 
-See [PAGINATION.md](./PAGINATION.md).
+See [PAGINATION.md](./PAGINATION.md). For a step-by-step walkthrough see [USAGE.md](./USAGE.md).
 
 ## Limitations
 
