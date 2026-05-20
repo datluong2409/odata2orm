@@ -25,14 +25,16 @@ A step-by-step walkthrough of `odata2orm`. For a quick reference / operator tabl
 pnpm add odata2orm        # or npm i / yarn add
 ```
 
-Install the peer ORM you actually use:
+Install the peer ORM you actually use (recommended versions):
 
 ```bash
-pnpm add typeorm          # only if using TypeORM
-pnpm add sequelize        # only if using Sequelize
-pnpm add mongoose         # only if using Mongoose
+pnpm add typeorm@^0.3.17  # only if using TypeORM   (also ^1.0.0)
+pnpm add sequelize@^6     # only if using Sequelize (v5 works, ^7-alpha works)
+pnpm add mongoose@^8      # only if using Mongoose  (^7, ^6 also work)
 # Prisma needs no peer dep — output is a plain object
 ```
+
+See the [compatibility matrix in README.md](./README.md#compatibility-matrix) for minimums tested and rationale.
 
 TypeScript is supported out of the box (types ship from `dist/`).
 

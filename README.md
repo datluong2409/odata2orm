@@ -19,10 +19,20 @@ Convert OData v4 query (`$filter`, `$top`, `$skip`, `$orderby`, `$select`, `$cou
 
 ```bash
 pnpm add odata2orm        # or npm / yarn
-pnpm add typeorm          # peer dep, only if using TypeORM
-pnpm add sequelize        # peer dep, only if using Sequelize
-pnpm add mongoose         # peer dep, only if using Mongoose
+pnpm add typeorm@^0.3.17  # peer dep — recommended >=0.3.17, also works on ^1.0.0
+pnpm add sequelize@^6     # peer dep — recommended ^6 (LTS), v5 works, v7-alpha works
+pnpm add mongoose@^8      # peer dep — recommended ^8 (latest), ^7 and ^6 also work
 ```
+
+### Compatibility matrix
+
+| Peer dep   | Recommended    | Minimum tested | Notes                                                                                 |
+|------------|----------------|----------------|---------------------------------------------------------------------------------------|
+| `typeorm`  | `^0.3.17`      | `0.3.17`       | Uses `And` / `Or` `FindOperator`s — both landed in `0.3.10`+, stable from `0.3.17`. `1.0.0` works (same API). |
+| `sequelize`| `^6` (`6.37+`) | `5.x`          | Only `Op.*` symbols used — present since v5. `^7-alpha` works. Without it, fallback `Symbol.for('sequelize.op.*')` keys are emitted (inspectable but won't execute against a real DB). |
+| `mongoose` | `^8` (`8.x`)   | `6.x`          | Output is plain MongoDB operator strings (`$eq`, `$gt`, ...) — any driver-compatible Mongoose accepts it. No version coupling. |
+
+Node.js: `>=18` recommended (matches the LTS line all three peers target). Prisma needs no peer dep.
 
 ## Quick start
 
