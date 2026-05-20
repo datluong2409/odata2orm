@@ -484,12 +484,12 @@ describe('OData to Prisma Converter - Integration Tests', () => {
 
     test('Should handle different ORMs correctly', () => {
       const odataFilter = "Name eq 'John' and Age gt 25";
-      
-      // Prisma should work
+
+      // Prisma + TypeORM are implemented
       expect(() => convertToPrisma(odataFilter)).not.toThrow();
-      
-      // Other ORMs should throw "coming soon" errors
-      expect(() => convertToTypeORM(odataFilter)).toThrow(/coming soon/);
+      expect(() => convertToTypeORM(odataFilter)).not.toThrow();
+
+      // Sequelize + Mongoose still pending
       expect(() => convertToSequelize(odataFilter)).toThrow(/coming soon/);
       expect(() => convertToMongoose(odataFilter)).toThrow(/coming soon/);
     });
