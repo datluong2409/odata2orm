@@ -12,14 +12,16 @@ Convert OData v4 query (`$filter`, `$top`, `$skip`, `$orderby`, `$select`, `$cou
 |-----------|:------:|:-------------:|:----------:|------------------------------------|
 | Prisma    |   ✅   |      ✅       |     ✅     | Schema validation, nested queries  |
 | TypeORM   |   ✅   |      ✅       |     ✅     | Uses `FindOperator` (peer dep)     |
-| Sequelize |   ⏳   |      ✅       |     ✅     | Filter conversion pending          |
-| Mongoose  |   ⏳   |      ✅       |     ✅     | Filter conversion pending          |
+| Sequelize |   ✅   |      ✅       |     ✅     | Uses `Op` symbols (peer dep)       |
+| Mongoose  |   ✅   |      ✅       |     ✅     | Native MongoDB `$ops`              |
 
 ## Install
 
 ```bash
 pnpm add odata2orm        # or npm / yarn
 pnpm add typeorm          # peer dep, only if using TypeORM
+pnpm add sequelize        # peer dep, only if using Sequelize
+pnpm add mongoose         # peer dep, only if using Mongoose
 ```
 
 ## Quick start
