@@ -173,26 +173,141 @@ const [rows, total] = await Promise.all([
 </details>
 
 <details>
-<summary><b>⏳ Sequelize</b> — query builder ready, filter pending</summary>
+<summary><b>🟦 Sequelize</b> — full filter + query builder (peer dep)</summary>
 
-Builder + pagination work; `convert()` not implemented.
+Install `sequelize` alongside this lib. Output uses `Sequelize.Op` symbols. If `sequelize` is not installed, fallback `Symbol.for('sequelize.op.*')` keys are used (still inspectable, but you should install the real package for production).
+
+### Filter only
 
 ```ts
-import { buildSequelizeQuery } from 'odata2orm';
-// Throws "coming soon" on $filter; orderBy / limit / offset / attributes work.
+import { convertToSequelize } from 'odata2orm';
+import { Op } from 'sequelize';
+
+convertToSequelize("name eq 'John'");
+// { name: { [Op.eq]: 'John' } }
+
+convertToSequelize("age gt 18 and age lt 65");
+// { age: { [Op.gt]: 18, [Op.lt]: 65 } }
+
+convertToSequelize("status in ('a','b','c')");
+// { status: { [Op.in]: ['a','b','c'] } }
+
+convertToSequelize("not (age lt 18)");
+// { [Op.not]: { age: { [Op.lt]: 18 } } }
 ```
+
+### Full query
+
+```ts
+import { buildSequelizeQuery, buildSequelizePagination } from 'odata2orm';
+
+const query = buildSequelizeQuery({
+  $filter: "status eq 'active'",
+  $top: 15,
+  $skip: 10,
+  $orderby: 'createdAt desc, name asc',
+  $select: 'id,name,status',
+});
+// Model.findAll(query)
+// query.order      = [['createdAt','DESC'], ['name','ASC']]
+// query.attributes = ['id','name','status']
+// query.limit      = 15
+// query.offset     = 10
+
+const { findQuery, countQuery } = buildSequelizePagination(params);
+const [rows, total] = await Promise.all([
+  Model.findAll(findQuery),
+  Model.count(countQuery),
+]);
+```
+
+### Semantics
+
+| OData                                  | Sequelize output                              |
+|----------------------------------------|-----------------------------------------------|
+| AND on different fields                | merged object                                 |
+| AND on same field                      | merged op object `{ [gt]: ..., [lt]: ... }`   |
+| OR on same field (auto-optimized)      | `{ [Op.in]: [...] }`                          |
+| OR on different fields                 | `{ [Op.or]: [{...}, {...}] }`                 |
+| NOT                                    | `{ [Op.not]: ... }`                           |
+| `contains` / `startswith` / `endswith` | `[Op.like]` (or `[Op.iLike]` if insensitive)  |
+| `field eq null`                        | `{ [Op.is]: null }`                           |
+| `field ne null`                        | `{ [Op.not]: null }`                          |
+| `year(date) eq 2024`                   | `{ [Op.gte]: start, [Op.lt]: end }`           |
+| nested path `a/b/c`                    | dot key `'a.b.c'` (use with `include`)        |
 
 </details>
 
 <details>
-<summary><b>⏳ Mongoose</b> — query builder ready, filter pending</summary>
+<summary><b>🟩 Mongoose</b> — full filter + query builder</summary>
 
-Builder + pagination work; `convert()` not implemented.
+No peer dep needed — output uses plain MongoDB operator strings (`$eq`, `$gt`, `$in`, ...). Feed directly to `Model.find()`.
+
+### Filter only
 
 ```ts
-import { buildMongooseQuery } from 'odata2orm';
-// Throws "coming soon" on $filter; sort / limit / skip / select work.
+import { convertToMongoose } from 'odata2orm';
+
+convertToMongoose("name eq 'John'");
+// { name: 'John' }
+
+convertToMongoose("age gt 18 and age lt 65");
+// { age: { $gt: 18, $lt: 65 } }
+
+convertToMongoose("status in ('a','b','c')");
+// { status: { $in: ['a','b','c'] } }
+
+convertToMongoose("contains(name, 'jo')", { caseSensitive: false });
+// { name: { $regex: 'jo', $options: 'i' } }
+
+convertToMongoose("not (name eq 'John' or age gt 30)");
+// { $nor: [{ name: 'John' }, { age: { $gt: 30 } }] }
 ```
+
+### Full query
+
+```ts
+import { buildMongooseQuery, buildMongoosePagination } from 'odata2orm';
+
+const query = buildMongooseQuery({
+  $filter: "status eq 'active'",
+  $top: 15,
+  $skip: 10,
+  $orderby: 'createdAt desc, name asc',
+  $select: 'id,name,status',
+});
+// Model.find(query.filter).sort(query.sort).skip(query.skip).limit(query.limit).select(query.select)
+// query.filter = { status: 'active' }
+// query.sort   = { createdAt: -1, name: 1 }
+// query.select = { id: 1, name: 1, status: 1 }
+
+const { findQuery, countQuery } = buildMongoosePagination(params);
+const [rows, total] = await Promise.all([
+  Model.find(findQuery.filter).sort(findQuery.sort).skip(findQuery.skip).limit(findQuery.limit),
+  Model.countDocuments(countQuery.filter),
+]);
+```
+
+### Semantics
+
+| OData                                  | Mongoose / MongoDB output                                |
+|----------------------------------------|----------------------------------------------------------|
+| `field eq v`                           | `{ field: v }` (implicit eq)                             |
+| `field ne v`                           | `{ field: { $ne: v } }`                                  |
+| AND on different fields                | merged object                                            |
+| AND on same field (different ops)      | merged op object `{ $gt: ..., $lt: ... }`                |
+| AND collision (same op same field)     | `{ $and: [{...}, {...}] }`                               |
+| OR on same field (auto-optimized)      | `{ $in: [...] }`                                         |
+| OR on different fields                 | `{ $or: [...] }`                                         |
+| NOT value                              | `{ field: { $ne: v } }`                                  |
+| NOT op clause                          | `{ field: { $not: { $op: v } } }`                        |
+| NOT of OR                              | `{ $nor: [...] }`                                        |
+| `contains` / `startswith` / `endswith` | `$regex` (with `$options: 'i'` if `caseSensitive: false`)|
+| `field eq null`                        | `{ field: null }`                                        |
+| `year(date) eq 2024`                   | `{ field: { $gte: start, $lt: end } }`                   |
+| nested path `a/b/c`                    | dot key `'a.b.c'`                                        |
+
+Regex specials in string literals are escaped automatically.
 
 </details>
 
@@ -232,7 +347,7 @@ See [PAGINATION.md](./PAGINATION.md).
 
 ## Limitations
 
-Need raw SQL: `length()`, `round()`, `floor()`, `ceiling()`, `month()` / `day()` extraction, complex subqueries.
+Need raw SQL (or aggregation pipeline for Mongo): `length()`, `round()`, `floor()`, `ceiling()`, `month()` / `day()` extraction, complex subqueries.
 
 ## Develop
 
